@@ -30,6 +30,12 @@ HEADERS = { "origin": "https://www.facebook.com",
 
 # First get info which conversation to download, chunk size and offset
 conversation = input("Conversation ID: ")
+
+is_group_conv = input("Is this a group conversation? [y/n] ")
+while is_group_conv != "y" and is_group_conv != "n":
+	is_group_conv = input("Wrong answer. Is this a group conversation? [y/n] ")
+
+is_group_conv = (is_group_conv == "y")
 conversation_name = input("Chat partner name [optional]: ")
 chunk_size = int(input("Chunk size [default: " + str(DEFAULT_CHUNK_SIZE) + "]: ") or DEFAULT_CHUNK_SIZE)
 offset = int(input("Offset location [default: " + str(DEFAULT_OFFSET) + "]: ") or DEFAULT_OFFSET)
@@ -65,19 +71,26 @@ headers["cookie"] = config["cookie"]
 raw_messages = []
 messages_data = '{ "payload" : "empty" }'
 
+
+data_text = { "client": "web_messenger",
+			  "__user": config["user"],
+			  "__a": config["a"],
+			  "__dyn": config["dyn"],
+			  "__req": config["req"],
+			  "__rev": config["rev"],
+			  "fb_dtsg": config["fb_dtsg"],
+			  "ttstamp": config["ttstamp"] }
+
 # Goes on while FB doesn't inform of conversation end
 while "end_of_history" not in json.loads(messages_data)["payload"]: 
-	data_text = { "messages[user_ids][" + conversation + "][offset]": offset,
-				  "messages[user_ids][" + conversation + "][timestamp]": timestamp,
-				  "messages[user_ids][" + conversation + "][limit]": chunk_size,
-				  "client": "web_messenger",
-				  "__user": config["user"],
-				  "__a": config["a"],
-				  "__dyn": config["dyn"],
-				  "__req": config["req"],
-				  "__rev": config["rev"],
-				  "fb_dtsg": config["fb_dtsg"],
-				  "ttstamp": config["ttstamp"]}
+
+	if not is_group_conv:
+		data_text = { "messages[user_ids][" + conversation + "][offset]": offset,
+					  "messages[user_ids][" + conversation + "][timestamp]": timestamp,
+					  "messages[user_ids][" + conversation + "][limit]": chunk_size }
+	else:
+		data_text = { "messages[thread_fbids][" + conversation + "][offset]": offset,
+					  "messages[thread_fbids][" + conversation + "][limit]": chunk_size }
 
 	data = urllib.parse.urlencode(data_text)
 	req = urllib.request.Request(REQ_URL, data.encode("ascii"), headers)

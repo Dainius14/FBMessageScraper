@@ -30,8 +30,7 @@ You're now all set to start downloading messages.
 ### Downloading messages
 
 1. Get the conversation ID for those messages by opening clicking on your partner's profile picture, and checking the URL. The number sequence is their Facebook ID. If it's not a numerical ID, go to [FindMyFbID](http://findmyfbid.com). Copy it.
-2. For group conversations, the ID can be retrieved from the messages tab, as part of the URL. You must use `group_dumper.py` instead.
-3. Launch `dumper.py` and enter conversation ID. Additionally you can supply partner's name, chunk size and offset. Custom config file can be provided via command-line argument.
-4. To use text_printer.py, do: `python text_printer.py {configuration_file}, {id}`. This will print your message on the terminal screen to redirect the output to a .txt file, do : `python text_printer.py {configuration_file}, {id} > output.txt`.
+2. For group conversations, the ID can be retrieved from the messages tab, as part of the URL.
+3. Launch `dumper.py` and enter conversation ID. Additionally you can supply conversation name, chunk size and offset. Custom config file can be provided via command-line argument.
 
 Messages are saved by default to `messages/{id or supplied_name}/`
