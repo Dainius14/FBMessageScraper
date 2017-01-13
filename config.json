@@ -1,16 +1,13 @@
 {
-  "cookie": "<enter cookie here>",
-  "user": "<your facebook user id (10 characters)>",
-  "a" : "<ex. 1, use string literal (not integer)>",
-  "dyn:" : "<long string of characters and numbers>"
-  "req" : "<single-character string>",
-  "fb_dtsg" : "<your fb_dtsg>",
-  "ttstamp" : "<your timestapm>",
-  "rev" : "<your rev>",
-  "ids_dictionary" : {
-    "fbid:XXXXXXXXXX" : "first_user",
-    "fbid:XXXXXXXXXX" : "second_user"
-  },
-  "error_timeout" : 30,
-  "general_timeout" : 7
+  "cookie": "cookie_from_request_headers",
+  "user": "__user",
+  "a": "__a",
+  "dyn": "_dyn",
+  "req": "_req",
+  "rev": "_rev",
+  "fb_dtsg": "fb_dtsg",
+  "ttstamp": "ttstamp",
+  
+  "error_timeout": 30,
+  "general_timeout": 7
 }
