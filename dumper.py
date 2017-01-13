@@ -1,123 +1,160 @@
-# This code is a fork of of Raghav Sood's 2014 script, hosted on https://github.com/RaghavSood/FBMessageScraper
-# Changes compared to commit 4e3f268:
-# * Uses configuration files instead of hardcoded values
-# * Fixed a bug detecting the end_of_history mark
-# * Fixed a bug downloading the latest messages
-
-import urllib2
-import urllib
+import datetime
 import gzip
-import os
+import io
 import json
 import sys
+import os
+import urllib
+import urllib.parse
+import urllib.request
 import time
-import StringIO
 
-__author__ = "Raghav Sood"
-__copyright__ = "Copyright 2014"
-__credits__ = ["Raghav Sood"]
-__license__ = "CC"
-__version__ = "1.0"
-__maintainer__ = "Raghav Sood"
-__email__ = "raghavsood@appaholics.in"
-__status__ = "Production"
+# Constants
+DEFAULT_CHUNK_SIZE = 1000
+DEFAULT_OFFSET = 0
+CONFIG_FILE = "config.json"
 
-if len(sys.argv) <= 1:
-	print "Usage:\n 	python dumper.py [config file] [conversation ID] [chunk_size (recommended: 2000)] [{optional} offset location (default: 0)]"
-	print "Example conversation with Raghav Sood"
-	print "	python dumper.py 1075686392 2000 0"
-	sys.exit()
+REQ_URL = "https://www.facebook.com/ajax/mercury/thread_info.php"
+
+HEADERS = { "origin": "https://www.facebook.com", 
+			"accept-encoding": "gzip,deflate", 
+			"accept-language": "en-US,en;q=0.8",
+			"pragma": "no-cache", 
+			"user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.122 Safari/537.36", 
+			"content-type": "application/x-www-form-urlencoded", 
+			"accept": "*/*", 
+			"cache-control": "no-cache", 
+			"referer": "https://www.facebook.com/messages/zuck"}
+
+
+
+# First get info which conversation to download, chunk size and offset
+conversation = input("Conversation ID: ")
+conversation_name = input("Chat partner name [optional]: ")
+chunk_size = int(input("Chunk size [default: " + str(DEFAULT_CHUNK_SIZE) + "]: ") or DEFAULT_CHUNK_SIZE)
+offset = int(input("Offset location [default: " + str(DEFAULT_OFFSET) + "]: ") or DEFAULT_OFFSET)
+print()
+
+# Supplying config file via command-line arguments
+if len(sys.argv) >= 2:
+	CONFIG_FILE = sys.argv[1]
+
+with open(CONFIG_FILE) as configFile:
+	config = json.load(configFile)
+
+if conversation_name != "":
+	dir = "messages/" + conversation_name + "/"
+else:
+	dir = "messages/" + conversation + "/"
+
+raw_dir = dir + "raw/"
 
 try:
-	with open(sys.argv[1], 'r+') as infile:
-		config = json.load(infile)
-except:
-	print "Failed to load configuration. Did you specify a proper configuration JSON?"
-	sys.exit()
-
-messages = []
-talk = sys.argv[2]
-offset = int(sys.argv[4]) if len(sys.argv) >= 5 else int("0")
-messages_data = '{ "payload" : "empty"}'
-json_end_record = "end_of_history"
-limit = int(sys.argv[3])
-headers = {"origin": "https://www.facebook.com", 
-"accept-encoding": "gzip,deflate", 
-"accept-language": "en-US,en;q=0.8", 
-"cookie": config["cookie"],
-"pragma": "no-cache", 
-"user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.122 Safari/537.36", 
-"content-type": "application/x-www-form-urlencoded", 
-"accept": "*/*", 
-"cache-control": "no-cache", 
-"referer": "https://www.facebook.com/messages/zuck"}
-base_directory = "Messages/"
-directory = base_directory + str(talk) + "/"
-pretty_directory = base_directory + str(talk) + "/Pretty/"
-fringe_message_timestamp = 0 # when extracting a [newer .. older] portion of one's message history, facebook requires:
-							 # -numeric id newer, -timestamp newer, -numeric id older, where numeric id newer is 0 for the
-							 # the newest message, 1 for the one before that, etc.
-try:
-	os.makedirs(directory)
+	os.makedirs(dir)
+	os.makedirs(raw_dir)
 except OSError:
 	pass # already exists
 
-try:
-	os.makedirs(pretty_directory)
-except OSError:
-	pass # already exists
+# When extracting a [newer .. older] portion of one's message history, facebook requires:
+# -numeric id newer, -timestamp newer, -numeric id older, where numeric id newer is 0 for the
+# the newest message, 1 for the one before that, etc.
+timestamp = 0 
 
-while json_end_record not in json.loads(messages_data)["payload"]: # see if the JSON has a json_end_record key
-	data_text = {"messages[user_ids][" + str(talk) + "][offset]": str(offset),
-				 "messages[user_ids][" + str(talk) + "][timestamp]": fringe_message_timestamp,
-				 "messages[user_ids][" + str(talk) + "][limit]": str(limit),
-				 "client": "web_messenger",
-				 "__user": config["user"],
-				 "__a": config["a"],
-				 "__dyn": config["dyn"],
-				 "__req": config["req"],
-				 "fb_dtsg": config["fb_dtsg"],
-				 "ttstamp": config["ttstamp"],
-				 "__rev": config["rev"]}
-	data = urllib.urlencode(data_text)
-	url = "https://www.facebook.com/ajax/mercury/thread_info.php"
+headers = HEADERS
+headers["cookie"] = config["cookie"]
+raw_messages = []
+messages_data = '{ "payload" : "empty" }'
 
-	print "Retrieving messages " + str(offset) + "-" + str(limit+offset) + " for conversation ID " + str(talk)
-	req = urllib2.Request(url, data, headers)
-	response = urllib2.urlopen(req)
-	compressed = StringIO.StringIO(response.read())
-	decompressedFile = gzip.GzipFile(fileobj=compressed)
+# Goes on while FB doesn't inform of conversation end
+while "end_of_history" not in json.loads(messages_data)["payload"]: 
+	data_text = { "messages[user_ids][" + conversation + "][offset]": offset,
+				  "messages[user_ids][" + conversation + "][timestamp]": timestamp,
+				  "messages[user_ids][" + conversation + "][limit]": chunk_size,
+				  "client": "web_messenger",
+				  "__user": config["user"],
+				  "__a": config["a"],
+				  "__dyn": config["dyn"],
+				  "__req": config["req"],
+				  "__rev": config["rev"],
+				  "fb_dtsg": config["fb_dtsg"],
+				  "ttstamp": config["ttstamp"]}
 
+	data = urllib.parse.urlencode(data_text)
+	req = urllib.request.Request(REQ_URL, data.encode("ascii"), headers)
 
-	outfile = open(directory + str(offset) + "-" + str(limit+offset) + ".json", 'w')
+	print("Retrieving messages " + str(offset) + "-" + str(chunk_size + offset) + "...")
+	
+	response = urllib.request.urlopen(req)
+	compressed = io.BytesIO(response.read())
+	decompressedFile = gzip.open(compressed)
+
 	messages_data = decompressedFile.read()
 	messages_data = messages_data[9:]
 	json_data = json.loads(messages_data)
+	
+	# Writes raw file
+	with open(raw_dir + str(offset) + "-" + str(chunk_size + offset) + ".json", 'w') as outfile:
+		json.dump(json_data, outfile, indent = "\t")
+
 	if json_data is not None and json_data['payload'] is not None:
 		try:
-			if not messages: # if this is the first batch, insert the whole thing
-				messages = json_data['payload']['actions']
+			if not raw_messages: # if this is the first batch, insert the whole thing
+				raw_messages = json_data['payload']['actions']
 			else:
-				messages = json_data['payload']['actions'][:-1] + messages # if this isn't the first batch, the final
+				raw_messages = json_data['payload']['actions'][:-1] + raw_messages # if this isn't the first batch, the final
 																	# message was already there in the previous batch
-			fringe_message_timestamp = json_data['payload']['actions'][0]['timestamp']
+			timestamp = json_data['payload']['actions'][0]['timestamp']
 		except KeyError:
 			pass # no more messages
 	else:
-		print "Error in retrieval. Retrying after " + str(config["error_timeout"]) + "s"
-		print "Data Dump:"
-		print json_data
+		print("Error retrieving. Retrying after " + str(config["error_timeout"]) + "s")
+		print("Data Dump:")
+		print(json_data)
 		time.sleep(config["error_timeout"])
 		continue
-	outfile.write(messages_data)
-	outfile.close()
-	command = "python -mjson.tool " + directory + str(offset) + "-" + str(limit+offset) + ".json > " + pretty_directory + str(offset) + "-" + str(limit+offset) + ".pretty.json"
-	os.system(command)
-	offset = offset + limit
+
+	offset += chunk_size
 	time.sleep(config["general_timeout"])
 
-finalfile = open(directory + "complete.json", 'wb')
-finalfile.write(json.dumps(messages))
-finalfile.close()
-command = "python -mjson.tool " + directory + "complete.json > " + pretty_directory + "complete.pretty.json"
-os.system(command)
+
+
+print("Message count: " + str(len(raw_messages)) + ". Writing to file...");
+
+
+# As not all fields are useful, filters only the interesting ones into a complete file
+
+messages = []
+for raw_msg in raw_messages:
+	msg = {}
+
+	# Writes name of participants
+	if raw_msg["author"] == "fbid:" + conversation:
+		msg["author_name"] = conversation_name
+	else:
+		msg["author_name"] = "You"
+
+	msg["author_id"] = raw_msg["author"]
+	msg["time"] = datetime.datetime.utcfromtimestamp(raw_msg["timestamp"] / 1000).strftime('%Y-%m-%d %H:%M:%S')
+
+	# Check if it is not a log message
+	if "body" in raw_msg:
+		msg["msg"] = raw_msg["body"]
+	else:
+		msg["log_msg"] = raw_msg["log_message_body"]
+
+	msg["att"] = {}
+	# Check if there's an attachement
+	if bool(raw_msg["has_attachment"]):
+		msg["att"]["type"] = raw_msg["attachments"][0]["attach_type"]
+		msg["att"]["name"] = raw_msg["attachments"][0]["name"]
+		msg["att"]["url"] = raw_msg["attachments"][0]["url"]
+		msg["att"]["preview_url"] = raw_msg["attachments"][0]["preview_url"]
+		msg["att"]["large_preview_url"] = raw_msg["attachments"][0]["large_preview_url"]
+		msg["att"]["thumbnail_url"] = raw_msg["attachments"][0]["thumbnail_url"]
+
+	messages.append(msg)
+
+with open(dir + "complete.json", 'w') as outfile:
+    json.dump(messages, outfile, indent = "\t", )
+ 
+print("Messages dump completed.")
