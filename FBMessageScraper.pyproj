@@ -5,7 +5,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{e29cac38-5cd1-428c-a16c-1a976813279c}</ProjectGuid>
     <ProjectHome />
-    <StartupFile>dumper.py</StartupFile>
+    <StartupFile>image_dumper.py</StartupFile>
     <SearchPath />
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
@@ -25,8 +25,13 @@
   <ItemGroup>
     <Compile Include="dumper.py" />
     <Compile Include="get_stats.py" />
-    <Compile Include="group_dumper.py" />
+    <Compile Include="image_dumper.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="message_adapter.py" />
+    <Compile Include="raw_formatter.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="text_printer.py" />
   </ItemGroup>
   <ItemGroup>
