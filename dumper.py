@@ -123,9 +123,9 @@ while "end_of_history" not in json.loads(messages_data)["payload"]:
 	json_data = json.loads(messages_data)
 	
 	# Writes raw file
-	with open(raw_dir + str(offset) + "-" + str(chunk_size + offset) + ".json", 'w') as outfile:
-		json.dump(json_data, outfile, indent = "\t")
-
+	with open(raw_dir + str(offset) + "-" + str(chunk_size + offset) + ".json", 'w', encoding = "utf-8") as outfile:
+		json.dump(json_data, outfile, indent = "\t", ensure_ascii = False)
+		
 	if json_data is not None and json_data['payload'] is not None:
 		# Bad config data
 		if "__dialog" in json_data["payload"]:
@@ -196,7 +196,7 @@ final_dump = []
 final_dump.append(conversation)
 final_dump.append(messages)
 
-with open(dir + MESSAGES_FILE, 'w') as outfile:
-    json.dump(final_dump, outfile, indent = "\t", )
+with open(dir + MESSAGES_FILE, 'w', encoding = "utf-8") as outfile:
+    json.dump(final_dump, outfile, indent = "\t", ensure_ascii = False)
  
 print("Messages dump completed.")
