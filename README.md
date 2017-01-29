@@ -2,7 +2,7 @@
 
 A forked repo of the original FB Message Scraper. I updated it to Python 3, moved code around, edited output format and made it to work in a more user friendly (IMO) way, without the need to give everything by command-line arguments. Original code was pretty spaghetti IMO.
 
-So this is a simple python script to download the entire conversation from Facebook, not limited like the one in the data dump provided by Facebook
+So this is a simple python script to download the entire conversation from Facebook, not limited like the one in the data dump provided by Facebook. After downloading messages, downloading all photos is possible.
 
 Outputs the conversation in a user-friendly easy to read JSON format, as well as the raw JSON for each individual chunk.
 
@@ -34,3 +34,16 @@ You're now all set to start downloading messages.
 3. Launch `dumper.py` and enter conversation ID. Additionally you can supply conversation name, chunk size and offset. Custom config file can be provided via command-line argument.
 
 Messages are saved by default to `messages/{id or supplied_name}/`
+
+### Downloading photos
+
+1. Download all messages with dumper.py for the chat you want.
+2. Open the network tab of the Developer tools.
+3. Open [Facebook Messages](https://www.facebook.com/messages), go to any chat and open any photo.
+4. Look for POST request which starts with /webgraphql/query/?query_id=...
+5. Copy `query_id` from there e.g. 909417132156716.
+6. Open image_dumper.pym, enter folder name of downloaded messages and then enter `query_id`.
+
+Photos are saved by default to `messages/{id or supplied_name}/img` with date as file name.
+
+The same Query ID can be used for several days to download photos.
